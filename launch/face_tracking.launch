@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+
+<launch>
+  <param name="face_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_face.xml" />
+  <param name="eye_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_eye.xml" />
+  <param name="smile_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_smile.xml" />
+
+  <node pkg="marty_face_tracker" type="marty_face_tracker" name="face_tracking"
+  output="screen"/>
+
+</launch>

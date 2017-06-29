@@ -13,6 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   std_msgs
+  geometry_msgs
+  message_generation
+  marty_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -50,9 +53,9 @@ find_package(OpenCV REQUIRED)
 
 ## Generate messages in the 'msg' folder
 # add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
+#  FILES
+#  Point.msg
+#  CentroidMsg.msg
 # )
 
 ## Generate services in the 'srv' folder
@@ -70,10 +73,12 @@ find_package(OpenCV REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs#   std_msgs
-# )
+generate_messages(
+ DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  marty_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -107,7 +112,7 @@ find_package(OpenCV REQUIRED)
 catkin_package(
    INCLUDE_DIRS include
    LIBRARIES ${PROJECT_NAME}
-   CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
+   CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs message_runtime marty_msgs
    DEPENDS opencv)
 
 #catkin_package(

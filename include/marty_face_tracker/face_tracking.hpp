@@ -1,7 +1,11 @@
+#include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <ros/ros.h>
 #include <sensor_msgs/image_encodings.h>
+#include <std_msgs/Int8MultiArray.h>
+#include "std_msgs/MultiArrayDimension.h"
+#include "marty_msgs/CentroidMsg.h"
+#include "geometry_msgs/Point.h"
 
 #include "opencv2/objdetect/objdetect.hpp"
 #include <opencv2/highgui/highgui.hpp>
@@ -11,45 +15,43 @@
 #include <stdio.h>
 #include <vector>
 
-
-static const std::string FACE_DETECT_OUT = "Face detection";
-static const std::string GREY = "BGR2GRAY";
-
-// TODO: sort this mess out, can't have it hardcoded
-
-static const std::string directory = "/home/helmi/catkin_ws/src/marty_face_tracker/classifiers/";
-// static const std::string directory = "/classifiers/";
-
-static const std::string face_cascade_default = directory + "haarcascade_frontalface_default.xml";
-static const std::string face_cascade = directory + "haarcascade_face.xml";
-static const std::string eye_cascade = directory + "haarcascade_eye.xml";
-static const std::string smile_cascade = directory + "haarcascade_smile.xml";
-
-static const std::string sub_name = "/marty/camera/image";
-static const std::string face_pub_name = "/marty/face_tracking/image/faces";
-static const std::string eye_pub_name = "/marty/face_tracking/image/eyes";
-static const std::string smile_pub_name = "/marty/face_tracking/image/smiles";
-
-
 class FaceTracker {
+
 protected:
   ros::NodeHandle nh_;
+
   image_transport::ImageTransport it_;
   image_transport::Subscriber image_sub_;
-  image_transport::Publisher face_pub_;
-  image_transport::Publisher eye_pub_;
-  image_transport::Publisher smile_pub_;
+  image_transport::Publisher face_pub_, eye_pub_, smile_pub_;
+
+  ros::Publisher face_centroid_;
 
 public:
   FaceTracker(ros::NodeHandle& nh);
   ~FaceTracker();
-  void loadClassifiers();
-  void imageCb(const sensor_msgs::ImageConstPtr &msg);
 
 private:
-  cv::CascadeClassifier face_classifier;
-  cv::CascadeClassifier eye_classifier;
-  cv::CascadeClassifier smile_classifier;
+  std::string sub_name;
 
+  std::string face_pub_name, eye_pub_name, smile_pub_name;
+
+  std::string face_centroid_name;
+
+  std::string face_cascade, eye_cascade, smile_cascade;
+
+  cv::CascadeClassifier face_classifier, eye_classifier, smile_classifier;
+
+  std::vector<cv::Rect> faces, eyes, smiles;
+
+  cv_bridge::CvImagePtr face_image, eye_image, smile_image, face_region;
+  cv::Mat grey_image;
+
+  void loadParams();
+  void loadClassifiers();
+  void rosSetup();
+  void imageCb(const sensor_msgs::ImageConstPtr &msg);
+  void detect();
+  void detectEyes(cv::Mat roi);
+  void detectSmile(cv::Mat roi);
 
 };
