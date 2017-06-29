@@ -9,9 +9,8 @@
 #include <marty_face_tracker/face_tracking.hpp>
 
 FaceTracker::FaceTracker(ros::NodeHandle &nh) : it_(nh) {
-
   this->loadParams();
-  FaceTracker::loadClassifiers();
+  this->loadClassifiers();
   this->rosSetup();
 }
 
@@ -22,6 +21,32 @@ void FaceTracker::loadParams() {
   nh_.param<std::string>("face_classifier", face_cascade, "ERROR");
   nh_.param<std::string>("eye_classifier", eye_cascade, "ERROR");
   nh_.param<std::string>("smile_classifier", smile_cascade, "ERROR");
+
+  std::vector<std::string> param1 = {"face", "eye", "smile"};
+  std::vector<std::string> param2 = {"_scale_factor", "_min_neighbours",
+                                     "_min_size", "_max_size"};
+  float default_vals[4] = {1.1, 3, 30, 30};
+  bool default_param = true;
+  nh_.param<bool>("ignore", default_param, true);
+
+  if (default_param != true) {
+    ROS_WARN("'ignore' param set to false, loading  detection parameters from "
+             "config file\n");
+    for (size_t i = 0; i < 3; i++) {
+      for (size_t j = 0; j < 4; j++) {
+        nh_.param<float>(param1[i] + param2[j], detection_parameters[i][j],
+                         default_vals[j]);
+      }
+    }
+  } else {
+    ROS_WARN("'ignore' param set to true, loading default values\n");
+    memcpy(detection_parameters[0], default_vals,
+           sizeof(detection_parameters[0]));
+    memcpy(detection_parameters[1], default_vals,
+           sizeof(detection_parameters[1]));
+    memcpy(detection_parameters[2], default_vals,
+           sizeof(detection_parameters[2]));
+  }
 
   if (face_cascade.compare("ERROR") == 0) {
     ROS_ERROR("Face classifier unset.\n");
@@ -64,12 +89,11 @@ void FaceTracker::rosSetup() {
   face_centroid_ =
       nh_.advertise<marty_msgs::CentroidMsg>(face_centroid_name, 1);
 
-  // face_centroid = it_.advertise(face_centroid_name, 1);
-
   ROS_INFO_STREAM("Subscribing from: " << sub_name << std::endl);
   ROS_INFO_STREAM("Publishing to: " << face_pub_name << std::endl);
   ROS_INFO_STREAM("Publishing to: " << smile_pub_name << std::endl);
   ROS_INFO_STREAM("Publishing to: " << eye_pub_name << std::endl);
+  ROS_INFO_STREAM("Publishing to: " << face_centroid_name << std::endl);
 }
 
 void FaceTracker::loadClassifiers() {
@@ -119,15 +143,15 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
     return;
   }
 
-  detect();
+  detectFaces(faces, grey_image);
   int facesDetected = faces.size();
 
   cv::Rect region_of_interest;
   cv::Point offset;
-  marty_msgs::CentroidMsg centroid;
-  centroid.x.resize(facesDetected);
-  centroid.y.resize(facesDetected);
-  centroid.z.resize(facesDetected);
+
+  centroid.x.resize(facesDetected, 0);
+  centroid.y.resize(facesDetected, 0);
+  centroid.z.resize(facesDetected, 0);
 
   for (size_t i = 0; i < facesDetected; i++) {
     cv::rectangle(face_image->image, faces[i], cv::Scalar(255, 0, 0), 2);
@@ -142,6 +166,7 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
 
       offset.x = faces[i].x;
       offset.y = faces[i].y;
+      
       face_region->image = face_image->image(region_of_interest);
       detectEyes(face_region->image);
       detectSmile(face_region->image);
@@ -159,33 +184,45 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
   }
 
   for (size_t i = 0; i < smiles.size(); i++) {
-    std::cout << "detected " << smiles.size() << " smiles" << std::endl;
     smiles[i] += offset;
     std::cout << "smile " << i << " co-oords " << smiles[i] << std::endl;
     cv::rectangle(smile_image->image, smiles[i], cv::Scalar(0, 0, 255), 2);
   }
 
-  cv::waitKey(3);
+  publishData();
+}
+
+void FaceTracker::publishData() {
+
   // Output modified video stream
   face_pub_.publish(face_image->toImageMsg());
   eye_pub_.publish(eye_image->toImageMsg());
   smile_pub_.publish(smile_image->toImageMsg());
+
+  // Publish centroid co-ordinate of detected faces
   face_centroid_.publish(centroid);
 }
 
-void FaceTracker::detect() {
+void FaceTracker::detectFaces(std::vector<cv::Rect> &facesVector,
+                              cv::Mat image) {
   face_classifier.detectMultiScale(
-      grey_image, faces, 1.1, 3, 0 | cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
+      image, facesVector, detection_parameters[0][0],
+      detection_parameters[0][1], 0 | cv::CASCADE_SCALE_IMAGE,
+      cv::Size(detection_parameters[0][2], detection_parameters[0][3]));
 }
 
 void FaceTracker::detectEyes(cv::Mat roi) {
   eye_classifier.detectMultiScale(
-      roi, eyes, 1.1, 3, 0 | cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
+      roi, eyes, detection_parameters[1][0], detection_parameters[1][1],
+      0 | cv::CASCADE_SCALE_IMAGE,
+      cv::Size(detection_parameters[1][2], detection_parameters[1][3]));
 }
 
 void FaceTracker::detectSmile(cv::Mat roi) {
   smile_classifier.detectMultiScale(
-      roi, smiles, 1.1, 3, 0 | cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30));
+      roi, smiles, detection_parameters[2][0], detection_parameters[2][1],
+      0 | cv::CASCADE_SCALE_IMAGE,
+      cv::Size(detection_parameters[2][2], detection_parameters[2][3]));
 }
 
 int main(int argc, char **argv) {

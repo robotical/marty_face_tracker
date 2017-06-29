@@ -32,25 +32,25 @@ public:
 
 private:
   std::string sub_name;
-
   std::string face_pub_name, eye_pub_name, smile_pub_name;
-
   std::string face_centroid_name;
-
   std::string face_cascade, eye_cascade, smile_cascade;
+  std::vector<cv::Rect> faces, eyes, smiles;
+  // float face_params[4], eye_params[4], smile_params[4];
+  float detection_parameters[3][4];
 
   cv::CascadeClassifier face_classifier, eye_classifier, smile_classifier;
-
-  std::vector<cv::Rect> faces, eyes, smiles;
-
   cv_bridge::CvImagePtr face_image, eye_image, smile_image, face_region;
   cv::Mat grey_image;
+
+  marty_msgs::CentroidMsg centroid;
 
   void loadParams();
   void loadClassifiers();
   void rosSetup();
   void imageCb(const sensor_msgs::ImageConstPtr &msg);
-  void detect();
+  void publishData();
+  void detectFaces(std::vector<cv::Rect> &facesVector, cv::Mat image);
   void detectEyes(cv::Mat roi);
   void detectSmile(cv::Mat roi);
 

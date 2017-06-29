@@ -4,6 +4,7 @@
   <param name="face_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_face.xml" />
   <param name="eye_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_eye.xml" />
   <param name="smile_classifier"  value="$(find marty_face_tracker)/classifiers/haarcascade_smile.xml" />
+  <rosparam file="$(find marty_face_tracker)/cfg/detection_params.yaml" command="load" />
 
   <node pkg="marty_face_tracker" type="marty_face_tracker" name="face_tracking"
   output="screen"/>

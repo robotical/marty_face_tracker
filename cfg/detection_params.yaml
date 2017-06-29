@@ -1,0 +1,20 @@
+# This file contains the parameters for the detectMultiScale function used. Refer
+# to http://docs.opencv.org/2.4/modules/objdetect/doc/cascade_classification.html
+# for further clarification
+
+ignore: true # true == load program default values, false == load this file's
+
+face_scale_factor: 1.1 # Parameter specifying how much the image size is reduced at each image scale.
+face_min_neighbours: 3 # Parameter specifying how many neighbors each candidate rectangle should have to retain it.
+face_min_size: 30 # Minimum possible object size. Objects smaller than that are ignored.
+face_max_size: 30 # Maximum possible object size. Objects larger than that are ignored.
+
+eye_scale_factor: 1.1 # Parameter specifying how much the image size is reduced at each image scale.
+eye_min_neighbours: 3 # Parameter specifying how many neighbors each candidate rectangle should have to retain it.
+eye_min_size: 30 # Minimum possible object size. Objects smaller than that are ignored.
+eye_max_size: 30 # Maximum possible object size. Objects larger than that are ignored.
+
+smile_scale_factor: 1.1 # Parameter specifying how much the image size is reduced at each image scale.
+smile_min_neighbours: 3 # Parameter specifying how many neighbors each candidate rectangle should have to retain it.
+smile_min_size: 30 # Minimum possible object size. Objects smaller than that are ignored.
+smile_max_size: 30 # Maximum possible object size. Objects larger than that are ignored.
