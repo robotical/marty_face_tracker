@@ -1,0 +1,20 @@
+/*! \mainpage
+*
+* \section intro_sec marty_face_tracker
+*
+* This package enables <a href="http://robotical.io">Marty the Robot</a> to track multiple faces, eyes and smiles from an camera. \n\n
+*
+* There is one core class that enables this:
+*   - <a href="./classFaceTracker.html">FaceTracker</a>, which handles image processing, face detection and data output.
+*
+* \section Topics
+*     \subsection core Video output topics
+*         - /marty/face_tracking/image/faces - outputs a video feed overlaying a rectangle on detected faces
+*         - /marty/face_tracking/image/eyes - outputs a video feed overlaying a rectangle on detected eyes
+*         - /marty/face_tracking/image/smiles - outputs a video feed overlaying a rectangle on detected smiles
+*     \subsection core Data output topics
+*         - /marty/face_tracking/faces_centroid - outputs a data structure (CentroidMsg) containing centroid co-ordinates of detected faces
+*         - /marty/face_tracking/eyes_centroid- outputs a data structure (CentroidMsg) containing centroid co-ordinates of detected eyes
+*         - /marty/face_tracking/smiles_centroid - outputs a data structure (CentroidMsg) containing centroid co-ordinates of detected smiles
+*
+*/

@@ -1,3 +1,11 @@
+/**
+ * @file      face_tracking.hpp
+ * @brief     Marty tracks faces, eyes and smiles
+ * @author    Helmi Fraser <helmi@robotical.io>
+ * @date      2017-07-03
+ * @copyright (Apache) 2016 Robotical Ltd.
+ */
+
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
@@ -52,7 +60,7 @@ private:
   void publishData(bool image);
   void resetCentroidMsg(marty_msgs::CentroidMsg &msg, int size);
   void detectFaces(std::vector<cv::Rect> &facesVector, cv::Mat image);
-  void detectEyes(cv::Mat roi);
-  void detectSmile(cv::Mat roi);
+  void detectEyes(std::vector<cv::Rect> &eyes_vector, cv::Mat roi);
+  void detectSmile(std::vector<cv::Rect> &smiles_vector, cv::Mat roi);
 
 };

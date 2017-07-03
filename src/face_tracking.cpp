@@ -1,12 +1,17 @@
 /**
  * @file      face_tracking.cpp
- * @brief     Marty tracks a face
+ * @brief     Marty tracks faces, eyes and smiles
  * @author    Helmi Fraser <helmi@robotical.io>
- * @date      2017-06-23
+ * @date      2017-07-03
  * @copyright (Apache) 2016 Robotical Ltd.
  */
 
 #include <marty_face_tracker/face_tracking.hpp>
+
+/**
+ * @brief       FaceTracker object constructor
+ * @details      Loads ROS parameters, desired classifiers and  sets up ROS
+ */
 
 FaceTracker::FaceTracker(ros::NodeHandle &nh) : it_(nh) {
   this->loadParams();
@@ -16,12 +21,20 @@ FaceTracker::FaceTracker(ros::NodeHandle &nh) : it_(nh) {
 
 FaceTracker::~FaceTracker() {}
 
+/**
+ * @brief       Load ROS parameters
+ * @details     Loads runtime parameters from parameter server. Loads classifier names,
+ *              whether video output is set, and face/eye/smile detection parameters.
+ */
+
 void FaceTracker::loadParams() {
   bool fail = false;
+  // Loads classifier names and will signal an error if unset
   nh_.param<std::string>("face_classifier", face_cascade, "ERROR");
   nh_.param<std::string>("eye_classifier", eye_cascade, "ERROR");
   nh_.param<std::string>("smile_classifier", smile_cascade, "ERROR");
 
+  // If true, Marty will not publish video over ROS, just co-ordinate data
   nh_.param<bool>("video_output", video_output, false);
 
   if (video_output == true) {
@@ -33,10 +46,16 @@ void FaceTracker::loadParams() {
   std::vector<std::string> param1 = {"face", "eye", "smile"};
   std::vector<std::string> param2 = {"_scale_factor", "_min_neighbours",
                                      "_min_size", "_max_size"};
+
+  // Array of floats holding default values for face/eye/smile detection. In ascending order
+  // of scale factor, minimum neighbors, minimum size and maximum size
   float default_vals[4] = {1.1, 3, 30, 30};
   bool default_param = true;
+  // If true, will load the default parameters instead of the config file's
   nh_.param<bool>("ignore", default_param, true);
 
+  // Iterates through the config file's parameters and saves them to detection_parameters,
+  // else copies the default_vals
   if (default_param != true) {
     ROS_WARN("'ignore' param set to false, loading  detection parameters from "
              "config file\n");
@@ -56,6 +75,7 @@ void FaceTracker::loadParams() {
            sizeof(detection_parameters[2]));
   }
 
+  // Error handling for unset classifiers
   if (face_cascade.compare("ERROR") == 0) {
     ROS_ERROR("Face classifier unset.\n");
     ROS_WARN("Set a face classifier in ../launch/face_tracking.launch!\n");
@@ -80,6 +100,11 @@ void FaceTracker::loadParams() {
     exit(0);
   }
 }
+
+/**
+ * @brief       Sets up ROS publishers and subscribers
+ * @details     Sets publisher and subscriber names and sets up data publishers
+ */
 
 void FaceTracker::rosSetup() {
   sub_name = "/marty/camera/image";
@@ -117,6 +142,11 @@ void FaceTracker::rosSetup() {
                                                  << std::endl);
 }
 
+/**
+ * @brief       Load face, eye and smile classifiers
+ * @details     Loads the classifiers as set by ROS params. Will shutdown if loading failed.
+ */
+
 void FaceTracker::loadClassifiers() {
   bool fail = false;
   bool loaded_face = face_classifier.load(face_cascade);
@@ -148,15 +178,25 @@ void FaceTracker::loadClassifiers() {
   }
 }
 
+/**
+ * @brief       Call back for an incoming image message. Handles image processing.
+ * @details     Performs image processing, and applies a Cascade Classifier over these
+ *              series of images to detect faces etc. Publishes image data and object
+ *              co-ordinates.
+ */
+
 void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
 
   try {
+    // Converts ROS images to OpenCV
     face_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     face_region = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     eye_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     smile_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
+    // Converts the image color encoding to greyscale
     cv::cvtColor(face_image->image, grey_image, cv::COLOR_BGR2GRAY);
+    // Equalizes the histogram of the grey image
     cv::equalizeHist(grey_image, grey_image);
 
   } catch (cv_bridge::Exception &e) {
@@ -164,39 +204,54 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
     return;
   }
 
+  // Calls the detection function and places facial co-ordinates within 'faces', a vector
+  // of cv::Rect. Note: co-ordinates start from the top left of image, with y-axis vertically
+  // downward.
   detectFaces(faces, grey_image);
-  int facesDetected = faces.size();
+  int faces_detected = faces.size();
 
+  // Region of interest is the area of the image containing a face
   cv::Rect region_of_interest;
-  cv::Point offset[facesDetected];
+  // Offset is needed to remap the co-ordinates from ROI space to output space
+  cv::Point offset[faces_detected];
 
-  resetCentroidMsg(faces_centroid, facesDetected);
-  resetCentroidMsg(smiles_centroid, facesDetected);
-  resetCentroidMsg(eyes_centroid, facesDetected);
+  // Clears the co-ordinate containers and resizes them as needed
+  resetCentroidMsg(faces_centroid, faces_detected);
+  resetCentroidMsg(smiles_centroid, faces_detected);
+  resetCentroidMsg(eyes_centroid, faces_detected);
 
-  for (size_t i = 0; i < facesDetected; i++) {
+  // For every face in the image...
+  for (size_t i = 0; i < faces_detected; i++) {
+    // ...draw a Rect over each face
     cv::rectangle(face_image->image, faces[i], cv::Scalar(255, 0, 0), 2);
 
+    // ...if a valid co-ordinate
     if (faces[i].x > 0 && faces[i].y > 0) {
+      // ...define ROI, area of this detected face
       region_of_interest =
           cv::Rect(faces[i].x, faces[i].y, faces[i].width, faces[i].height);
 
+      // ...this face's centroid co-ordinates
       faces_centroid.x[i] = (int)faces[i].x + faces[i].width / 2;
       faces_centroid.y[i] = (int)faces[i].y + faces[i].height / 2;
       faces_centroid.z[i] = 0;
 
+      // ...this face's origin co-ordinates in the output space (needed for smile and eyes)
       offset[i].x = faces[i].x;
       offset[i].y = faces[i].y;
 
+      // ...crops the full size image to the ROI
       face_region->image = face_image->image(region_of_interest);
-      // face_region->image = grey_image(region_of_interest);
-      detectEyes(face_region->image);
-      detectSmile(face_region->image);
+      // ...passes ROI to functions that detect eyes and smiles
+      detectEyes(eyes, face_region->image);
+      detectSmile(smiles, face_region->image);
     } else {
+      // If co-ords aren't valid, just output an unmodified image
       face_region->image = face_image->image;
     }
   }
 
+  // For each eye, calculate centroid and draw a rectangle over them
   for (size_t i = 0; i < eyes.size(); i++) {
     eyes[i] += offset[i];
     eyes_centroid.x[i] = (int)eyes[i].x + eyes[i].width / 2;
@@ -205,6 +260,7 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
     cv::rectangle(eye_image->image, eyes[i], cv::Scalar(0, 255, 0), 2);
   }
 
+  // For each smile, calculate centroid and draw a rectangle over them
   for (size_t i = 0; i < smiles.size(); i++) {
     smiles[i] += offset[i];
     smiles_centroid.x[i] = (int)smiles[i].x + smiles[i].width / 2;
@@ -213,8 +269,16 @@ void FaceTracker::imageCb(const sensor_msgs::ImageConstPtr &msg) {
     cv::rectangle(smile_image->image, smiles[i], cv::Scalar(0, 0, 255), 2);
   }
 
+  // Publish data
   publishData(video_output);
 }
+
+/**
+ * @brief       Publishes image data and detected object co-ordinates
+ * @details     Always publishes object co-ordinates. Argument determines whether video is
+ *              published.
+ * @param       image True == video published, false == no video
+ */
 
 void FaceTracker::publishData(bool image) {
 
@@ -231,33 +295,71 @@ void FaceTracker::publishData(bool image) {
   eyes_centroid_pub_.publish(eyes_centroid);
 }
 
+/**
+ * @brief       Zeroes a CentroidMsg object
+ * @details     Resizes the object to a given size and zeroes the internal arrays
+ * @param       &msg CentroidMsg object to be modified
+ * @param       size Size to resize the float arrays within a CentroidMsg
+ */
+
 void FaceTracker::resetCentroidMsg(marty_msgs::CentroidMsg &msg, int size) {
   msg.x.resize(size, 0);
   msg.y.resize(size, 0);
   msg.z.resize(size, 0);
 }
 
-void FaceTracker::detectFaces(std::vector<cv::Rect> &facesVector,
+/**
+ * @brief       Applies a face detection CascadeClassifier to an input image
+ * @details     Performs face detection on the given image. Saves the co-ordinates to a
+ *              vector of cv::Rect objects. The detection parameters can be modified in the
+ *              config file.
+ * @param       &faces_vector Contains the co-ordinates of detected faces in the image
+ * @param       image Desired image to apply face detection to
+ */
+
+void FaceTracker::detectFaces(std::vector<cv::Rect> &faces_vector,
                               cv::Mat image) {
   face_classifier.detectMultiScale(
-      image, facesVector, detection_parameters[0][0],
+      image, faces_vector, detection_parameters[0][0],
       detection_parameters[0][1], 0 | cv::CASCADE_SCALE_IMAGE,
       cv::Size(detection_parameters[0][2], detection_parameters[0][3]));
 }
 
-void FaceTracker::detectEyes(cv::Mat roi) {
+/**
+ * @brief       Applies an eye detection CascadeClassifier to an input image
+ * @details     Performs eye detection on the given image. Saves the co-ordinates to a
+ *              vector of cv::Rect objects. The detection parameters can be modified in the
+ *              config file.
+ * @param       &eyes_vector Contains the co-ordinates of detected eyes in the image
+ * @param       roi Desired image to apply face detection to
+ */
+
+void FaceTracker::detectEyes(std::vector<cv::Rect> &eyes_vector, cv::Mat roi) {
   eye_classifier.detectMultiScale(
-      roi, eyes, detection_parameters[1][0], detection_parameters[1][1],
+      roi, eyes_vector, detection_parameters[1][0], detection_parameters[1][1],
       0 | cv::CASCADE_SCALE_IMAGE,
       cv::Size(detection_parameters[1][2], detection_parameters[1][3]));
 }
 
-void FaceTracker::detectSmile(cv::Mat roi) {
+/**
+ * @brief       Applies a smile detection CascadeClassifier to an input image
+ * @details     Performs smile detection on the given image. Saves the co-ordinates to a
+ *              vector of cv::Rect objects. The detection parameters can be modified in the
+ *              config file.
+ * @param       &smiles_vector Contains the co-ordinates of detected smiles in the image
+ * @param       roi Desired image to apply face detection to
+ */
+
+void FaceTracker::detectSmile(std::vector<cv::Rect> &smiles_vector, cv::Mat roi) {
   smile_classifier.detectMultiScale(
-      roi, smiles, detection_parameters[2][0], detection_parameters[2][1],
+      roi, smiles_vector, detection_parameters[2][0], detection_parameters[2][1],
       0 | cv::CASCADE_SCALE_IMAGE,
       cv::Size(detection_parameters[2][2], detection_parameters[2][3]));
 }
+
+/**
+ * @brief       Starts everything
+ */
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "face_tracking");
