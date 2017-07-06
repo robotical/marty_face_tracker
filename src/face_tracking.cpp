@@ -29,6 +29,10 @@ FaceTracker::~FaceTracker() {}
 
 void FaceTracker::loadParams() {
   bool fail = false;
+  bool camera_detected = false;
+
+  nh_.param<bool>("camera", camera_detected, false);
+
   // Loads classifier names and will signal an error if unset
   nh_.param<std::string>("face_classifier", face_cascade, "ERROR");
   nh_.param<std::string>("eye_classifier", eye_cascade, "ERROR");
@@ -73,6 +77,12 @@ void FaceTracker::loadParams() {
            sizeof(detection_parameters[1]));
     memcpy(detection_parameters[2], default_vals,
            sizeof(detection_parameters[2]));
+  }
+
+  if (camera_detected == false) {
+    ROS_ERROR("Raspicam undetected.\n");
+    ROS_WARN("Has the raspicam node been instantiated? If not, check ros_marty/launch/marty.launch\n");
+    fail = true;
   }
 
   // Error handling for unset classifiers

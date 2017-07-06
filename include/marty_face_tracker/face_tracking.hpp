@@ -45,7 +45,7 @@ private:
   std::string face_cascade, eye_cascade, smile_cascade;
   std::vector<cv::Rect> faces, eyes, smiles;
   float detection_parameters[3][4];
-  bool video_output;
+  bool video_output, camera_detected;
 
   cv::CascadeClassifier face_classifier, eye_classifier, smile_classifier;
   cv_bridge::CvImagePtr face_image, eye_image, smile_image, face_region;
